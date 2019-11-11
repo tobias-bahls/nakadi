@@ -173,12 +173,6 @@ public class TimelineService {
             }
             timelineDbRepository.updateTimelime(timeline);
         }
-
-        try {
-            eventTypeCache.updated(eventType.getName());
-        } catch (Exception e) {
-            throw new NakadiBaseException(e.getMessage(), e);
-        }
     }
 
     public Timeline createDefaultTimeline(final EventTypeBase eventType, final int partitionsCount)

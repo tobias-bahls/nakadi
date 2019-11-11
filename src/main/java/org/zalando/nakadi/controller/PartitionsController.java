@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,20 +19,25 @@ import org.zalando.nakadi.domain.NakadiCursorLag;
 import org.zalando.nakadi.domain.PartitionEndStatistics;
 import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Timeline;
+import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
 import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.exceptions.runtime.NakadiBaseException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.NotFoundException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.repository.EventTypeRepository;
+import org.zalando.nakadi.service.AdminService;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.CursorConverter;
 import org.zalando.nakadi.service.CursorOperationsService;
+import org.zalando.nakadi.service.RepartitioningService;
 import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.view.Cursor;
 import org.zalando.nakadi.view.CursorLag;
 import org.zalando.nakadi.view.EventTypePartitionView;
+import org.zalando.nakadi.view.PartitionsNumberView;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
@@ -38,6 +45,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static org.springframework.http.ResponseEntity.noContent;
 import static org.springframework.http.ResponseEntity.ok;
 
 @RestController
@@ -50,18 +58,24 @@ public class PartitionsController {
     private final CursorOperationsService cursorOperationsService;
     private final EventTypeRepository eventTypeRepository;
     private final AuthorizationValidator authorizationValidator;
+    private final AdminService adminService;
+    private final RepartitioningService repartitioningService;
 
     @Autowired
     public PartitionsController(final TimelineService timelineService,
                                 final CursorConverter cursorConverter,
                                 final CursorOperationsService cursorOperationsService,
                                 final EventTypeRepository eventTypeRepository,
-                                final AuthorizationValidator authorizationValidator) {
+                                final AuthorizationValidator authorizationValidator,
+                                final AdminService adminService,
+                                final RepartitioningService repartitioningService) {
         this.timelineService = timelineService;
         this.cursorConverter = cursorConverter;
         this.cursorOperationsService = cursorOperationsService;
         this.eventTypeRepository = eventTypeRepository;
         this.authorizationValidator = authorizationValidator;
+        this.adminService = adminService;
+        this.repartitioningService = repartitioningService;
     }
 
     private static NakadiCursor selectLast(final List<Timeline> activeTimelines, final PartitionEndStatistics last,
@@ -134,8 +148,21 @@ public class PartitionsController {
 
             return ok().body(result);
         }
-
     }
+
+    @PutMapping(value = "/event-types/{name}/partitions")
+    public ResponseEntity<?> repartition(
+            @PathVariable("name") final String eventTypeName,
+            @RequestBody final PartitionsNumberView partitionsNumberView) throws NoSuchEventTypeException {
+        final EventType eventType = eventTypeRepository.findByName(eventTypeName);
+        if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+            throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, eventType.asResource());
+        }
+
+        repartitioningService.repartition(eventType, partitionsNumberView.getPartitionsNumber());
+        return noContent().build();
+    }
+
 
     private CursorLag getCursorLag(final String eventTypeName, final String partition, final String consumedOffset)
             throws InternalNakadiException, NoSuchEventTypeException, InvalidCursorException,

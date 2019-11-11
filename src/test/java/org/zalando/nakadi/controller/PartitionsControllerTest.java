@@ -14,8 +14,8 @@ import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.NakadiCursorLag;
 import org.zalando.nakadi.domain.PartitionStatistics;
-import org.zalando.nakadi.domain.storage.Storage;
 import org.zalando.nakadi.domain.Timeline;
+import org.zalando.nakadi.domain.storage.Storage;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
@@ -25,9 +25,11 @@ import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.repository.db.EventTypeCache;
 import org.zalando.nakadi.repository.kafka.KafkaPartitionStatistics;
 import org.zalando.nakadi.security.ClientResolver;
+import org.zalando.nakadi.service.AdminService;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.CursorConverter;
 import org.zalando.nakadi.service.CursorOperationsService;
+import org.zalando.nakadi.service.RepartitioningService;
 import org.zalando.nakadi.service.converter.CursorConverterImpl;
 import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.utils.TestUtils;
@@ -107,7 +109,8 @@ public class PartitionsControllerTest {
         when(timelineService.getTopicRepository((Timeline) any())).thenReturn(topicRepositoryMock);
         final CursorConverter cursorConverter = new CursorConverterImpl(eventTypeCache, timelineService);
         final PartitionsController controller = new PartitionsController(timelineService, cursorConverter,
-                cursorOperationsService, eventTypeRepositoryMock, authorizationValidator);
+                cursorOperationsService, eventTypeRepositoryMock, authorizationValidator,
+                mock(AdminService.class), mock(RepartitioningService.class));
 
         settings = mock(SecuritySettings.class);
 

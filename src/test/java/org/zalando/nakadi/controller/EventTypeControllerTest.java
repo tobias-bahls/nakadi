@@ -21,7 +21,6 @@ import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeBase;
 import org.zalando.nakadi.domain.EventTypeOptions;
-import org.zalando.nakadi.domain.EventTypeStatistics;
 import org.zalando.nakadi.domain.ResourceAuthorization;
 import org.zalando.nakadi.domain.ResourceAuthorizationAttribute;
 import org.zalando.nakadi.domain.Subscription;
@@ -37,7 +36,6 @@ import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.partitioning.PartitionStrategy;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.repository.TopicRepository;
-import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
 import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.problem.Problem;
@@ -139,60 +137,6 @@ public class EventTypeControllerTest extends EventTypeControllerTestCase {
         eventType.getSchema().setSchema("{}");
         postEventType(eventType).andExpect(status().isCreated()).andExpect(
                 header().string("Warning", "299 nakadi \"I am warning you. I am warning you, even more\""));
-    }
-
-    @Test
-    public void whenChangeDefaultStatiticsWithoutAnyChangeInPartitionThen422() throws Exception {
-        final EventType originalEventType = EventTypeTestBuilder.builder()
-                .build();
-
-        final EventType updatedEventType = EventTypeTestBuilder.builder()
-                .name(originalEventType.getName())
-                .defaultStatistic(new EventTypeStatistics(0,1))
-                .build();
-
-        doReturn(originalEventType).when(eventTypeRepository).findByName(any());
-        doReturn(true).when(featureToggleService)
-                .isFeatureEnabled(FeatureToggleService.Feature.REPARTITIONING);
-
-        putEventType(updatedEventType, originalEventType.getName())
-                .andExpect(status().isUnprocessableEntity());
-    }
-
-    @Test
-    public void whenIncreaseNumberOfPartitionThen200() throws Exception {
-        final EventType originalEventType = EventTypeTestBuilder.builder()
-                .build();
-
-        final EventType updatedEventType = EventTypeTestBuilder.builder()
-                .name(originalEventType.getName())
-                .defaultStatistic(new EventTypeStatistics(3, 3))
-                .build();
-
-        doReturn(originalEventType).when(eventTypeRepository).findByName(any());
-        doReturn(true).when(featureToggleService)
-                .isFeatureEnabled(FeatureToggleService.Feature.REPARTITIONING);
-
-        putEventType(updatedEventType, originalEventType.getName())
-                .andExpect(status().isOk());
-
-        final EventType updatedEventType1 = EventTypeTestBuilder.builder()
-                .name(originalEventType.getName())
-                .defaultStatistic(new EventTypeStatistics(1, 1))
-                .build();
-
-        putEventType(updatedEventType1, originalEventType.getName())
-                .andExpect(status().isOk());
-
-        final EventType updatedEventType2 = EventTypeTestBuilder.builder()
-                .name(originalEventType.getName())
-                .defaultStatistic(null)
-                .build();
-
-        doReturn(originalEventType).when(eventTypeRepository).findByName(any());
-
-        putEventType(updatedEventType2, originalEventType.getName())
-                .andExpect(status().isOk());
     }
 
     @Test

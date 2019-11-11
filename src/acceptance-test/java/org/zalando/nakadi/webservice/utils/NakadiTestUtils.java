@@ -26,6 +26,7 @@ import org.zalando.nakadi.domain.SubscriptionEventTypeStats;
 import org.zalando.nakadi.partitioning.PartitionStrategy;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
 import org.zalando.nakadi.utils.RandomSubscriptionBuilder;
+import org.zalando.nakadi.view.PartitionsNumberView;
 import org.zalando.nakadi.view.SubscriptionCursor;
 import org.zalando.nakadi.view.TimelineView;
 
@@ -41,6 +42,7 @@ import static com.jayway.restassured.RestAssured.given;
 import static com.jayway.restassured.RestAssured.when;
 import static com.jayway.restassured.http.ContentType.JSON;
 import static java.text.MessageFormat.format;
+import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.OK;
 
 public class NakadiTestUtils {
@@ -111,11 +113,11 @@ public class NakadiTestUtils {
         defaultStatistic.setWriteParallelism(partitionsNumber);
         eventType.setDefaultStatistic(defaultStatistic);
         final int statusCode = given()
-                .body(MAPPER.writeValueAsString(eventType))
+                .body(MAPPER.writeValueAsString(new PartitionsNumberView(partitionsNumber)))
                 .contentType(JSON)
-                .put(format("/event-types/{0}", eventType.getName()))
+                .put(format("/event-types/{0}/partitions", eventType.getName()))
                 .getStatusCode();
-        if (statusCode != 200) {
+        if (statusCode != NO_CONTENT.value()) {
             throw new RuntimeException("Failed to repartition event type");
         }
     }

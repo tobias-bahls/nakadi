@@ -21,6 +21,7 @@ import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeBase;
 import org.zalando.nakadi.domain.EventTypeOptions;
+import org.zalando.nakadi.domain.EventTypeStatistics;
 import org.zalando.nakadi.domain.Subscription;
 import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.enrichment.Enrichment;
@@ -97,7 +98,6 @@ public class EventTypeService {
     private final NakadiAuditLogPublisher nakadiAuditLogPublisher;
     private final EventTypeOptionsValidator eventTypeOptionsValidator;
     private final AdminService adminService;
-    private final RepartitioningService repartitioningService;
     private final JsonSchemaEnrichment jsonSchemaEnrichment;
 
     @Autowired
@@ -118,8 +118,7 @@ public class EventTypeService {
             @Value("${nakadi.kpi.event-types.nakadiEventTypeLog}") final String etLogEventType,
             final NakadiAuditLogPublisher nakadiAuditLogPublisher,
             final EventTypeOptionsValidator eventTypeOptionsValidator,
-            final AdminService adminService,
-            final RepartitioningService repartitioningService) {
+            final AdminService adminService) {
         this.eventTypeRepository = eventTypeRepository;
         this.timelineService = timelineService;
         this.partitionResolver = partitionResolver;
@@ -137,7 +136,6 @@ public class EventTypeService {
         this.nakadiAuditLogPublisher = nakadiAuditLogPublisher;
         this.eventTypeOptionsValidator = eventTypeOptionsValidator;
         this.adminService = adminService;
-        this.repartitioningService = repartitioningService;
         this.jsonSchemaEnrichment = new JsonSchemaEnrichment();
     }
 
@@ -405,7 +403,8 @@ public class EventTypeService {
             validateAudience(original, eventTypeBase);
             partitionResolver.validate(eventTypeBase);
             eventType = schemaEvolutionService.evolve(original, eventTypeBase);
-            repartitioningService.checkAndRepartition(original, eventType);
+            eventType.setDefaultStatistic(
+                    validateStatisticsUpdate(original.getDefaultStatistic(), eventType.getDefaultStatistic()));
             updateRetentionTime(original, eventType);
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -523,6 +522,18 @@ public class EventTypeService {
             LOG.error("Error deleting event type " + eventTypeName, e);
             throw new EventTypeDeletionException("Failed to delete event type " + eventTypeName);
         }
+    }
+
+    private EventTypeStatistics validateStatisticsUpdate(
+            final EventTypeStatistics existing,
+            final EventTypeStatistics newStatistics) throws InvalidEventTypeException {
+        if (existing != null && newStatistics == null) {
+            return existing;
+        }
+        if (!Objects.equals(existing, newStatistics)) {
+            throw new InvalidEventTypeException("default statistics must not be changed");
+        }
+        return newStatistics;
     }
 
     private void validateName(final String name, final EventTypeBase eventType) throws InvalidEventTypeException {
