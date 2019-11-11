@@ -53,7 +53,7 @@ public interface FeatureToggleService {
         public String getId() {
             return id;
         }
-        }
+    }
 
     class FeatureWrapper {
         private Feature feature;
